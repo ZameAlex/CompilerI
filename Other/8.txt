@@ -1,0 +1,8 @@
+PROGRAM PROG1;
+VAR VAR1: INTEGER;
+BEGIN
+    VAR1 := VAR2 [56];
+    IF
+        VAR3 := VAR4 [9];
+    VAR1 + VAR
+END

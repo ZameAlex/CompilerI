@@ -1,0 +1,8 @@
+PROGRAM PROG1;
+BEGIN
+    CASE A 5 + B 6
+    OF 
+    ENDCASE
+    ;
+
+END.

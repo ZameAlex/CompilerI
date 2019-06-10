@@ -1,0 +1,10 @@
+PROGRAM PROG1;
+
+    
+    VAR1 := VAR2 [56];
+    LOOP
+        VAR3 := VAR4 [9];
+    ENDLOOP
+    VAR1 + VAR2
+
+END.
