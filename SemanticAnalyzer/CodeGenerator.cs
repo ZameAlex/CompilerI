@@ -15,22 +15,24 @@ namespace SemanticAnalyzer
 		public Dictionary<string, int> Identifiers { get; protected set; }
 		public Dictionary<string, int> Keywords { get; protected set; }
 		public Dictionary<string, int> Constants { get; protected set; }
-		public List<string> Errors{ get; protected set; }
+		public List<string> Errors { get; protected set; }
 
 		private List<Lexem> globalVariables;
 		private List<Lexem> localVariables;
+		private Dictionary<Lexem, DataType> extVariables;
 		private StreamWriter writer;
-		private Lexem programIdentifier; 
-		private Lexem procedureIdentifier; 
+		private Lexem programIdentifier;
+		private Lexem procedureIdentifier;
 		private Lexem currentIdentifier;
 		private List<string> mainDataTypes;
 		private List<string> additionalDataTypes;
 		private bool isError;
-		private string dataType;
-		private string additionalType;
+		private DataType type;
 
-		public CodeGenerator(Dictionary<string,int> identifiers, Dictionary<string, int> keywords, Dictionary<string, int> constants) 
+		public CodeGenerator(Dictionary<string, int> identifiers, Dictionary<string, int> keywords, Dictionary<string, int> constants)
 		{
+			extVariables = new Dictionary<Lexem, DataType>();
+			type = DataType.None;
 			isError = false;
 			Errors = new List<string>();
 			globalVariables = new List<Lexem>();
@@ -41,13 +43,13 @@ namespace SemanticAnalyzer
 			Identifiers = identifiers;
 			Keywords = keywords;
 			Constants = constants;
-			
+
 		}
 
 		public void Generate(Node tree)
 		{
 			Analyze(tree);
-			writer.Dispose(); 
+			writer.Dispose();
 		}
 
 		private void Analyze(Node tree)
@@ -115,50 +117,66 @@ namespace SemanticAnalyzer
 					Analyze(tree.Children[1]);
 					Analyze(tree.Children[3]);
 					Analyze(tree.Children[4]);
+					type = DataType.None;
 					break;
 				case "<identifiers-list>":
 					Analyze(tree.Children.First());
-					if (tree.Children != null && tree.Children.Count>1)
+					if (tree.Children != null && tree.Children.Count > 1)
 						Analyze(tree.Children[1]);
 					break;
 				case "<attribute-list>":
 					Analyze(tree.Children.First());
 					if (tree.Children != null && tree.Children.Count > 1)
 						Analyze(tree.Children[1]);
-					dataType = null;
-					additionalType = null;
+					if (CheckType(DataType.Ext))
+					{
+						CheckExtVariable();
+					}
+					if(!(CheckBaseTypes() || CheckType(DataType.Signal)))
+						Errors.Add($"Error at [{currentIdentifier.line};{currentIdentifier.column + currentIdentifier.value.Length + 1}], should have base or signal type!");
 					break;
 				case "<attribute>":
 					var data = tree.Children.First().Data;
 					if (mainDataTypes.Contains(data))
 					{
-						if (!String.IsNullOrEmpty(dataType))
+						if (CheckBaseTypes())
 						{
-							dataType = null;
-							additionalType = null;
 							Errors.Add($"Error at [{currentIdentifier.line};{currentIdentifier.column + currentIdentifier.value.Length + 1}], {currentIdentifier.value} already have data type!");
 						}
 						else
 						{
-							dataType = data;
+							type |= AssignType(data);
 						}
 					}
-					else if(additionalDataTypes.Contains(data))
+					else if (additionalDataTypes.Contains(data))
 					{
-						if (!String.IsNullOrEmpty(dataType))
+						var additionalType = AssignType(data);
+						if (CheckType(additionalType))
+							Errors.Add($"Error at [{currentIdentifier.line};{currentIdentifier.column + currentIdentifier.value.Length + 1}], {currentIdentifier.value} already have such additional type!");
+						else if (additionalType == DataType.Signal)
+							type |= AssignType(data);
+						else if (CheckBaseTypes())
 						{
-							dataType = null;
-							additionalType = null;
-							Errors.Add($"Error at [{currentIdentifier.line};{currentIdentifier.column + currentIdentifier.value.Length + 1}], additional type should be first!");
-						}
-						else if (!String.IsNullOrEmpty(additionalType))
-						{
-							dataType = null;
-							additionalType = null;
-							Errors.Add($"Error at [{currentIdentifier.line};{currentIdentifier.column + currentIdentifier.value.Length + 1}], additional type should be onle one!");
+							Errors.Add($"Error at [{currentIdentifier.line};{currentIdentifier.column + currentIdentifier.value.Length + 1}], {currentIdentifier.value} have base datatype! Additional datatype should be the first one!");
 						}
 						else
-							additionalType = data;
+						{
+							switch (additionalType)
+							{
+
+								case DataType.Complex:
+									AnalyzeComplex();
+									break;
+								case DataType.Ext:
+									AnalyzeExt();
+									break;
+								case DataType.Signal:
+									AnalyzeSignal();
+									break;
+								default:
+									break;
+							}
+						}
 					}
 					break;
 				case "<procedure-identifier>":
@@ -191,5 +209,65 @@ namespace SemanticAnalyzer
 			}
 
 		}
+
+		private bool CheckType(DataType typeToCheck)
+		{
+			return (type & typeToCheck) == typeToCheck;
+		}
+
+		private bool CheckBaseTypes()
+		{
+			return CheckType(DataType.Integer) || CheckType(DataType.Float) || CheckType(DataType.BlockFloat);
+		}
+
+		private DataType AssignType(string type)
+		{
+			switch (type)
+			{
+				case "FLOAT":
+					return DataType.Float;
+				case "INTEGER":
+					return DataType.Integer;
+				case "BLOCKFLOAT":
+					return DataType.BlockFloat;
+				case "COMPLEX":
+					return DataType.Complex;
+				case "EXT":
+					return DataType.Ext;
+				case "SIGNAL":
+					return DataType.Signal;
+				default:
+					return DataType.None;
+			}
+		}
+
+		private void AnalyzeComplex()
+		{
+				type |= DataType.Complex;
+		}
+		private void AnalyzeExt()
+		{
+			if (CheckType(DataType.None) || CheckType(DataType.Signal))
+				type |= DataType.Ext;
+			else
+				Errors.Add($"Error at [{currentIdentifier.line};{currentIdentifier.column + currentIdentifier.value.Length + 1}], variable should have Ext modifier as first (except signal)!");//Not sure
+
+		}
+		private void AnalyzeSignal()
+		{
+			type |= DataType.Signal;
+		}
+
+		private void CheckExtVariable()
+		{
+			if (extVariables.Keys.Contains(currentIdentifier))
+			{
+				if (extVariables[currentIdentifier] != type)
+					Errors.Add($"Error at [{currentIdentifier.line};{currentIdentifier.column + currentIdentifier.value.Length + 1}], types should be the same for this variables!");
+			}
+			else
+				extVariables.Add(currentIdentifier, type);
+		}
+
 	}
 }

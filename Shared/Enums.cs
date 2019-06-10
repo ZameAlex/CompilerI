@@ -35,4 +35,17 @@ namespace Shared.Enums
 		Variable,
 		Identifier
 	}
+
+	[Flags]
+	public enum DataType
+	{
+		None = 0,
+		Integer = 1,
+		Float = 2,
+		BlockFloat = 3,
+		Complex = 4,
+		Ext = 8,
+		Signal = 16
+	}
+
 }
