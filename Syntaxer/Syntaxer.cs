@@ -114,6 +114,12 @@ namespace SyntaxAnalyzer
 		}
 		private void ParametersList(int currentLevel)
 		{
+			if (LexemString[currentLexem].value == ";")
+			{
+				Empty(currentLevel + 1);
+				Tree = Tree.Parent;
+				return;
+			}
 			RiseErrorOrAddNodeToTree(currentLevel, "(");
 			Tree.Add(new Node("<declarations-list>", currentLevel));
 			Tree = Tree.Children[1];
@@ -123,20 +129,18 @@ namespace SyntaxAnalyzer
 		}
 		private void DeclarationsList(int currentLevel)
 		{
-			Tree.Add(new Node("<declaration>", currentLevel));
-			Tree = Tree.Children[0];
-			Declaration(currentLevel + 1);
 			if (LexemString[currentLexem].value == ")")
 			{
 				Empty(currentLevel);
-
+				Tree = Tree.Parent;
+				return;
 			}
-			else
-			{
-				Tree.Add(new Node("<declarations-list>", currentLevel));
-				Tree = Tree.Children[1];
-				DeclarationsList(currentLevel + 1);
-			}
+			Tree.Add(new Node("<declaration>", currentLevel));
+			Tree = Tree.Children[0];
+			Declaration(currentLevel + 1);
+			Tree.Add(new Node("<declarations-list>", currentLevel));
+			Tree = Tree.Children[1];
+			DeclarationsList(currentLevel + 1);
 			Tree = Tree.Parent;
 
 		}
@@ -160,33 +164,37 @@ namespace SyntaxAnalyzer
 		}
 		private void IdentifierList(int currentLevel)
 		{
-			if (LexemString[currentLexem].value == ",")
+			if (LexemString[currentLexem].value == ":")
 			{
-				RiseErrorOrAddNodeToTree(currentLevel, ",");
-				Tree.Add(new Node("<variable-identifier>", currentLevel));
-				Tree = Tree.Children[1];
-				VariableIdentifier(currentLevel + 1);
-				Tree.Add(new Node("<identifiers-list>", currentLevel));
-				Tree = Tree.Children[2];
-				IdentifierList(currentLevel + 1);
+				Empty(currentLevel + 1);
+				Tree = Tree.Parent;
+				return;
 			}
-			else
-				Empty(currentLevel);
+
+			RiseErrorOrAddNodeToTree(currentLevel, ",");
+			Tree.Add(new Node("<variable-identifier>", currentLevel));
+			Tree = Tree.Children[1];
+			VariableIdentifier(currentLevel + 1);
+			Tree.Add(new Node("<identifiers-list>", currentLevel));
+			Tree = Tree.Children[2];
+			IdentifierList(currentLevel + 1);
+
 			Tree = Tree.Parent;
 		}
 		private void AttributesList(int currentLevel)
 		{
-			if (LexemString[currentLexem].value != ";")
+			if (LexemString[currentLexem].value == ";")
 			{
-				Tree.Add(new Node("<attribute>", currentLevel));
-				Tree = Tree.Children[0];
-				Attribute(currentLevel + 1);
-				Tree.Add(new Node("<attribute-list>", currentLevel));
-				Tree = Tree.Children[1];
-				AttributesList(currentLevel + 1);
+				Empty(currentLevel + 1);
+				Tree = Tree.Parent;
+				return;
 			}
-			else
-				Empty(currentLevel);
+			Tree.Add(new Node("<attribute>", currentLevel));
+			Tree = Tree.Children[0];
+			Attribute(currentLevel + 1);
+			Tree.Add(new Node("<attribute-list>", currentLevel));
+			Tree = Tree.Children[1];
+			AttributesList(currentLevel + 1);
 			Tree = Tree.Parent;
 		}
 		private void Attribute(int currentLevel)
